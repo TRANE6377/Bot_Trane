@@ -36,6 +36,14 @@ async def _send_digest(app: Application, digest_type: str):
         logger.exception(f"Failed to send {digest_type} digest")
 
 
+async def start_scheduler(app: Application):
+    """Called by PTB post_init hook — event loop is already running here."""
+    global _scheduler
+    if _scheduler and not _scheduler.running:
+        _scheduler.start()
+        logger.info("Scheduler started")
+
+
 def setup_scheduler(app: Application):
     global _scheduler
     tz_name = get_setting("timezone", "Europe/Moscow")
@@ -63,8 +71,7 @@ def setup_scheduler(app: Application):
         replace_existing=True,
     )
 
-    _scheduler.start()
-    logger.info(f"Scheduler started — morning: {morning_time}, evening: {evening_time} ({tz_name})")
+    logger.info(f"Scheduler configured — morning: {morning_time}, evening: {evening_time} ({tz_name})")
 
 
 def reschedule_jobs(app: Application):

@@ -1,34 +1,60 @@
-"""Uses Claude API to categorize and summarize news."""
+"""
+Free news categorization and summarization — no external API needed.
+Uses keyword matching for category detection and extractive summarization.
+"""
 
-import logging
+import re
 from dataclasses import dataclass
 
-import anthropic
-
-from config import ANTHROPIC_API_KEY
-
-logger = logging.getLogger(__name__)
-
-CATEGORIES = [
-    "Технологии",
-    "Политика",
-    "Экономика",
-    "Мир",
-    "Наука",
-    "Спорт",
-    "Культура",
-    "Прочее",
+# Keywords for category detection (Russian + English, lowercase substrings)
+CATEGORY_RULES: list[tuple[str, list[str]]] = [
+    ("💻 Технологии", [
+        "технолог", "apple", "google", "microsoft", "android", "iphone", "samsung",
+        "программ", "разработ", "стартап", " it ", "интернет", "crypto", "крипто",
+        "блокчейн", "нейросет", "искусственный интеллект", " ии ", " ai ", "openai",
+        "chatgpt", "гаджет", "tesla", "илон маск", "elon musk", "робот", "автопилот",
+        "смартфон", "ноутбук", "процессор", "чип", "nvidia", "intel", "amd",
+        "кибербезопасност", "хакер", "утечка данных", "приложени",
+    ]),
+    ("🏛 Политика", [
+        "политик", "президент", "правительств", "парламент", "выбор", "партия", "закон",
+        "санкц", "дипломат", "министр", "кремл", "белый дом", "вашингтон", "нато",
+        "оон", "госдума", "сенат", "конгресс", "выборы", "референдум", "оппозиц",
+        "путин", "байден", "трамп", "зеленск", "байден", "макрон", "шольц",
+    ]),
+    ("💰 Экономика", [
+        "экономик", "ввп", "инфляц", "рубл", "доллар", "евро", "банк", "бирж", "акци",
+        "нефт", "газ", "бюджет", "налог", "кредит", "рынок", "торговл", "бизнес",
+        "ключевая ставка", "цб рф", "центробанк", "фрс", "дефицит", "профицит",
+        "ввп", "ввс", "импорт", "экспорт", "пошлин", "инвестиц", "акцион",
+        "мвф", "всемирный банк", "биткоин", "нефтяно",
+    ]),
+    ("🌍 Мир", [
+        "украин", "россия", "китай", "европ", "ближний восток", "израил", "иран",
+        "конфликт", "международ", "война", "мир", "беженц", "нато", "сша", "africa",
+        "латинская америка", "азия", "ближний восток", "бомбардировк", "обстрел",
+        "перемири", "переговор",
+    ]),
+    ("🔬 Наука", [
+        "наук", "исследован", "учён", "открыт", "физик", "химик", "биолог", "космос",
+        "nasa", "роскосмос", "медицин", "здоровь", "вакцин", "вирус", "ковид",
+        "пандеми", "климат", "экологи", "генетик", "днк", "ракет", "спутник",
+        "марс", "луна", "астрономи", "квантов",
+    ]),
+    ("⚽ Спорт", [
+        "спорт", "футбол", "хоккей", "чемпионат", "олимпи", "матч", "турнир", "игрок",
+        "тренер", "команд", "лига", "кубок", "чемпион", "финал", "полуфинал",
+        "теннис", "формула 1", "мба", "nba", "nfl", "нхл", "рпл", "еврокубк",
+    ]),
+    ("🎭 Культура", [
+        "кино", "фильм", "музык", "книг", "искусств", "театр", "выставк", "концерт",
+        "литератур", "режиссёр", "актёр", "певец", "певица", "альбом", "премьер",
+        "оскар", "грэмми", "канн", "нобел", "художник", "скульптур",
+    ]),
 ]
 
-SYSTEM_PROMPT = """Ты помощник, который составляет краткие новостные сводки на русском языке.
-Тебе дают список новостей. Нужно:
-1. Сгруппировать по тематическим категориям
-2. Для каждой категории написать краткое резюме (2-4 предложения) о главных событиях
-Отвечай строго в формате:
-## НазваниеКатегории
-Краткое описание...
-
-Не добавляй ничего лишнего до или после блоков."""
+DEFAULT_CATEGORY = "📌 Прочее"
+MAX_ITEMS_PER_CATEGORY = 7
 
 
 @dataclass
@@ -37,83 +63,77 @@ class CategorySummary:
     summary: str
 
 
-def _build_news_text(items) -> str:
-    lines = []
-    for i, item in enumerate(items[:100], 1):  # cap at 100 items
-        source = getattr(item, "source_name", "?")
-        title = getattr(item, "title", "") or getattr(item, "text", "")[:120]
-        cat = getattr(item, "source_category", None)
-        category_hint = f" [{cat}]" if cat else ""
-        lines.append(f"{i}. [{source}{category_hint}] {title}")
-    return "\n".join(lines)
+def _detect_category(text: str) -> str:
+    lower = text.lower()
+    scores: dict[str, int] = {}
+    for category, keywords in CATEGORY_RULES:
+        score = sum(1 for kw in keywords if kw in lower)
+        if score > 0:
+            scores[category] = score
+    if not scores:
+        return DEFAULT_CATEGORY
+    return max(scores, key=lambda c: scores[c])
+
+
+def _extract_first_sentence(text: str, max_chars: int = 180) -> str:
+    """Return first meaningful sentence from text."""
+    text = re.sub(r"\s+", " ", text).strip()
+    # Try to split on sentence endings
+    for sep in (". ", ".\n", "! ", "? "):
+        idx = text.find(sep)
+        if 30 < idx < max_chars:
+            return text[: idx + 1].strip()
+    return text[:max_chars].strip() + ("…" if len(text) > max_chars else "")
 
 
 async def summarize_news(items) -> list[CategorySummary]:
     if not items:
         return []
 
-    if not ANTHROPIC_API_KEY:
-        logger.warning("ANTHROPIC_API_KEY not set — returning raw sources without summary")
-        return _fallback_summary(items)
-
-    news_text = _build_news_text(items)
-    user_message = (
-        f"Вот новости за последние 24 часа:\n\n{news_text}\n\n"
-        "Составь сводку по категориям."
-    )
-
-    try:
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-        response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-        )
-        raw = response.content[0].text
-        return _parse_response(raw)
-
-    except Exception as e:
-        logger.warning(f"Summarizer error: {e}")
-        return _fallback_summary(items)
-
-
-def _parse_response(text: str) -> list[CategorySummary]:
-    summaries: list[CategorySummary] = []
-    current_cat: str | None = None
-    current_lines: list[str] = []
-
-    for line in text.splitlines():
-        if line.startswith("## "):
-            if current_cat and current_lines:
-                summaries.append(CategorySummary(
-                    category=current_cat,
-                    summary=" ".join(current_lines).strip(),
-                ))
-            current_cat = line[3:].strip()
-            current_lines = []
-        elif current_cat and line.strip():
-            current_lines.append(line.strip())
-
-    if current_cat and current_lines:
-        summaries.append(CategorySummary(
-            category=current_cat,
-            summary=" ".join(current_lines).strip(),
-        ))
-
-    return summaries
-
-
-def _fallback_summary(items) -> list[CategorySummary]:
-    """Group by source_category without AI when API key is missing."""
-    groups: dict[str, list[str]] = {}
+    groups: dict[str, list] = {}
     for item in items:
-        cat = getattr(item, "source_category", None) or "Прочее"
-        title = getattr(item, "title", "") or getattr(item, "text", "")[:100]
-        groups.setdefault(cat, []).append(title)
+        # Use source_category override if set, otherwise auto-detect
+        forced = getattr(item, "source_category", None)
+        if forced:
+            # Map forced category to an icon version if possible
+            matched = next(
+                (c for c, _ in CATEGORY_RULES if forced.lower() in c.lower()), None
+            )
+            cat = matched or forced
+        else:
+            title = getattr(item, "title", "") or getattr(item, "text", "")[:200]
+            body = getattr(item, "summary", "") or getattr(item, "text", "")[:400]
+            cat = _detect_category(f"{title} {body}")
 
-    result = []
-    for cat, titles in groups.items():
-        snippet = " • ".join(titles[:5])
-        result.append(CategorySummary(category=cat, summary=snippet))
+        groups.setdefault(cat, []).append(item)
+
+    result: list[CategorySummary] = []
+    for category, cat_items in sorted(groups.items()):
+        lines = []
+        seen_titles: set[str] = set()
+
+        for item in cat_items[:MAX_ITEMS_PER_CATEGORY]:
+            title = getattr(item, "title", "") or getattr(item, "text", "")[:150]
+            title = title.strip()
+
+            # Deduplicate similar headlines
+            key = re.sub(r"\W+", "", title.lower())[:40]
+            if key in seen_titles:
+                continue
+            seen_titles.add(key)
+
+            source = getattr(item, "source_name", "")
+            url = getattr(item, "url", "")
+
+            if url:
+                lines.append(f"• [{title}]({url}) _({source})_")
+            else:
+                lines.append(f"• {title} _({source})_")
+
+        if lines:
+            result.append(CategorySummary(
+                category=category,
+                summary="\n".join(lines),
+            ))
+
     return result

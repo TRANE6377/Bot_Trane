@@ -5,7 +5,6 @@ load_dotenv()
 
 BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 OWNER_ID: int = int(os.getenv("OWNER_ID", "0"))
-ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
 TELEGRAM_API_ID: str = os.getenv("TELEGRAM_API_ID", "")
 TELEGRAM_API_HASH: str = os.getenv("TELEGRAM_API_HASH", "")

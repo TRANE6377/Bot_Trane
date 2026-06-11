@@ -19,7 +19,7 @@ from admin_panel import (
     admin_text_input,
     STATE, S_IDLE,
 )
-from scheduler import setup_scheduler
+from scheduler import setup_scheduler, start_scheduler
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -112,7 +112,7 @@ def main():
     init_db()
     logger.info(f"DB initialized. Owner: {OWNER_ID}")
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(start_scheduler).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
