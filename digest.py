@@ -1,5 +1,6 @@
-"""Assembles morning and evening digests."""
+"""Assembles morning and evening digests. Uses HTML parse mode."""
 
+import html
 import logging
 from datetime import date
 
@@ -12,62 +13,50 @@ from summarizer import summarize_news
 
 logger = logging.getLogger(__name__)
 
-CATEGORY_ICONS = {
-    "Технологии": "💻",
-    "Политика": "🏛",
-    "Экономика": "💰",
-    "Мир": "🌍",
-    "Наука": "🔬",
-    "Спорт": "⚽",
-    "Культура": "🎭",
-    "Прочее": "📌",
-}
+SEP = "─" * 28
 
 
-def _icon(category: str) -> str:
-    return CATEGORY_ICONS.get(category, "📰")
+def e(text: str) -> str:
+    """Escape text for Telegram HTML."""
+    return html.escape(str(text))
 
 
 def _format_events(events) -> str:
     if not events:
-        return "_Событий нет_"
+        return "<i>Событий нет</i>"
     lines = []
-    for e in events:
-        if e.all_day:
-            lines.append(f"• {e.title} *(весь день)*")
+    for ev in events:
+        if ev.all_day:
+            lines.append(f"• {e(ev.title)} <i>(весь день)</i>")
         else:
-            lines.append(f"• `{e.start_time}–{e.end_time}` {e.title}")
+            lines.append(f"• <code>{e(ev.start_time)}–{e(ev.end_time)}</code> {e(ev.title)}")
     return "\n".join(lines)
 
 
 def _format_reminders(reminders) -> str:
     if not reminders:
-        return "_Напоминаний нет_"
+        return "<i>Напоминаний нет</i>"
     lines = []
     for r in reminders:
-        priority_mark = " ❗" if r.priority >= 1 else ""
-        lines.append(f"• `{r.due_time}` {r.title}{priority_mark}")
+        mark = " ❗" if r.priority >= 1 else ""
+        lines.append(f"• <code>{e(r.due_time)}</code> {e(r.title)}{mark}")
     return "\n".join(lines)
 
 
 def _format_news_summary(summaries) -> str:
     if not summaries:
-        return "_Источники новостей не настроены или нет новостей за 24 часа_"
+        return "<i>Источники новостей не настроены или нет новостей за 24 часа</i>"
     parts = []
     for s in summaries:
-        icon = _icon(s.category)
-        parts.append(f"{icon} *{s.category}*\n{s.summary}")
+        parts.append(f"<b>{e(s.category)}</b>\n{s.summary}")
     return "\n\n".join(parts)
 
 
 async def build_morning_digest() -> str:
     today_str = date.today().strftime("%d.%m.%Y")
 
-    # Calendar
     events = get_today_events()
-    # Reminders
     reminders = get_today_reminders()
-    # News
     sources = get_active_sources()
     rss_items = await fetch_all_rss(sources)
     tg_items = await fetch_all_telegram(sources)
@@ -78,18 +67,17 @@ async def build_morning_digest() -> str:
     sources_count = len(sources)
     news_count = len(all_news)
 
-    text = (
-        f"🌅 *Доброе утро! Дайджест на {today_str}*\n"
-        f"{'─' * 30}\n\n"
-        f"📅 *Календарь на сегодня*\n"
+    return (
+        f"🌅 <b>Доброе утро! Дайджест на {e(today_str)}</b>\n"
+        f"{SEP}\n\n"
+        f"📅 <b>Календарь на сегодня</b>\n"
         f"{_format_events(events)}\n\n"
-        f"✅ *Напоминания на сегодня*\n"
+        f"✅ <b>Напоминания на сегодня</b>\n"
         f"{_format_reminders(reminders)}\n\n"
-        f"📰 *Новости за прошедшие 24 часа*\n"
-        f"_Источников: {sources_count} | Материалов: {news_count}_\n\n"
+        f"📰 <b>Новости за прошедшие 24 часа</b>\n"
+        f"<i>Источников: {sources_count} | Материалов: {news_count}</i>\n\n"
         f"{news_block}"
     )
-    return text
 
 
 async def build_evening_digest() -> str:
@@ -104,19 +92,17 @@ async def build_evening_digest() -> str:
 
     news_block = _format_news_summary(summaries)
 
-    text = (
-        f"🌆 *Вечерний дайджест — {today_str}*\n"
-        f"{'─' * 30}\n\n"
-        f"📅 *События на завтра*\n"
+    return (
+        f"🌆 <b>Вечерний дайджест — {e(today_str)}</b>\n"
+        f"{SEP}\n\n"
+        f"📅 <b>События на завтра</b>\n"
         f"{_format_events(tomorrow_events)}\n\n"
-        f"📰 *Главное за день*\n\n"
+        f"📰 <b>Главное за день</b>\n\n"
         f"{news_block}"
     )
-    return text
 
 
 def split_message(text: str, max_len: int = 4000) -> list[str]:
-    """Split long text into Telegram-safe chunks."""
     if len(text) <= max_len:
         return [text]
     chunks = []

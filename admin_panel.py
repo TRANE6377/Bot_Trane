@@ -97,8 +97,8 @@ def sources_list_keyboard(sources: list[dict]) -> InlineKeyboardMarkup:
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data[STATE] = S_IDLE
     await update.message.reply_text(
-        "🤖 *Панель управления ботом*\nВыбери раздел:",
-        parse_mode="Markdown",
+        "🤖 <b>Панель управления ботом</b>\nВыбери раздел:",
+        parse_mode="HTML",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -116,7 +116,7 @@ async def admin_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hint = "канала (например «Технологии»)" if src_type == "telegram" else "источника (например «Хабр»)"
         await update.message.reply_text(
             f"Введи название {hint}:\n_(или /skip для автоматического)_",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
     elif state == S_WAIT_NAME:
@@ -133,8 +133,8 @@ async def admin_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data[STATE] = S_IDLE
         type_label = "Telegram-канал" if src_type == "telegram" else "RSS/Сайт"
         await update.message.reply_text(
-            f"✅ *{type_label}* добавлен!\n`{url}` → {name}",
-            parse_mode="Markdown",
+            f"✅ <b>{type_label}</b> добавлен!\n<code>{url}</code> → {name}",
+            parse_mode="HTML",
             reply_markup=sources_menu_keyboard(),
         )
 
@@ -143,27 +143,27 @@ async def admin_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             set_setting("morning_time", text)
             context.user_data[STATE] = S_IDLE
             await update.message.reply_text(
-                f"✅ Утренний дайджест будет в *{text}*",
-                parse_mode="Markdown",
+                f"✅ Утренний дайджест будет в <b>{text}</b>",
+                parse_mode="HTML",
                 reply_markup=schedule_keyboard(),
             )
             # Reschedule
             _reschedule(context)
         else:
-            await update.message.reply_text("Неверный формат. Введи время в формате ЧЧ:ММ, например `08:30`", parse_mode="Markdown")
+            await update.message.reply_text("Неверный формат. Введи время в формате ЧЧ:ММ, например <code>08:30</code>", parse_mode="HTML")
 
     elif state == S_WAIT_EVENING:
         if re.match(r"^\d{1,2}:\d{2}$", text):
             set_setting("evening_time", text)
             context.user_data[STATE] = S_IDLE
             await update.message.reply_text(
-                f"✅ Вечерний дайджест будет в *{text}*",
-                parse_mode="Markdown",
+                f"✅ Вечерний дайджест будет в <b>{text}</b>",
+                parse_mode="HTML",
                 reply_markup=schedule_keyboard(),
             )
             _reschedule(context)
         else:
-            await update.message.reply_text("Неверный формат. Введи время в формате ЧЧ:ММ, например `20:00`", parse_mode="Markdown")
+            await update.message.reply_text("Неверный формат. Введи время в формате ЧЧ:ММ, например <code>20:00</code>", parse_mode="HTML")
 
 
 def _reschedule(context: ContextTypes.DEFAULT_TYPE):
@@ -183,22 +183,22 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "admin_menu":
         context.user_data[STATE] = S_IDLE
         await query.edit_message_text(
-            "🤖 *Панель управления ботом*\nВыбери раздел:",
-            parse_mode="Markdown",
+            "🤖 <b>Панель управления ботом</b>\nВыбери раздел:",
+            parse_mode="HTML",
             reply_markup=main_menu_keyboard(),
         )
 
     elif data == "admin_sources":
         await query.edit_message_text(
-            "📰 *Источники новостей*\nДобавляй RSS-ленты или Telegram-каналы:",
-            parse_mode="Markdown",
+            "📰 <b>Источники новостей</b>\nДобавляй RSS-ленты или Telegram-каналы:",
+            parse_mode="HTML",
             reply_markup=sources_menu_keyboard(),
         )
 
     elif data == "admin_schedule":
         await query.edit_message_text(
-            "⏰ *Расписание дайджестов*\nВыбери что изменить:",
-            parse_mode="Markdown",
+            "⏰ <b>Расписание дайджестов</b>\nВыбери что изменить:",
+            parse_mode="HTML",
             reply_markup=schedule_keyboard(),
         )
 
@@ -206,36 +206,36 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data[PENDING_TYPE] = "rss"
         context.user_data[STATE] = S_WAIT_URL
         await query.edit_message_text(
-            "🌐 *Добавить RSS / Сайт*\n\nВведи URL RSS-ленты:\n"
-            "Пример: `https://habr.com/rss/best/`\n\n"
-            "Большинство сайтов имеют RSS по адресу `/rss`, `/feed` или `/atom`.",
-            parse_mode="Markdown",
+            "🌐 <b>Добавить RSS / Сайт</b>\n\nВведи URL RSS-ленты:\n"
+            "Пример: <code>https://habr.com/rss/best/</code>\n\n"
+            "Большинство сайтов имеют RSS по адресу <code>/rss</code>, <code>/feed</code> или <code>/atom</code>.",
+            parse_mode="HTML",
         )
 
     elif data == "admin_add_tg":
         context.user_data[PENDING_TYPE] = "telegram"
         context.user_data[STATE] = S_WAIT_URL
         await query.edit_message_text(
-            "📡 *Добавить Telegram-канал*\n\nВведи @username или ссылку на канал:\n"
-            "Пример: `@durov` или `https://t.me/durov`\n\n"
+            "📡 <b>Добавить Telegram-канал</b>\n\nВведи @username или ссылку на канал:\n"
+            "Пример: <code>@durov</code> или <code>https://t.me/durov</code>\n\n"
             "⚠️ Требуется настройка Telethon (setup\\_telethon.py)",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
     elif data == "admin_list_sources":
         sources = get_all_sources()
         if not sources:
             await query.edit_message_text(
-                "📋 *Источников нет*\nДобавь первый источник:",
-                parse_mode="Markdown",
+                "📋 <b>Источников нет</b>\nДобавь первый источник:",
+                parse_mode="HTML",
                 reply_markup=sources_menu_keyboard(),
             )
         else:
             count = len(sources)
             await query.edit_message_text(
-                f"📋 *Источники новостей* ({count} шт.)\n\n"
+                f"📋 <b>Источники новостей</b> ({count} шт.)\n\n"
                 "✅/❌ — активен | 🗑 — удалить | 🔄 — вкл/выкл",
-                parse_mode="Markdown",
+                parse_mode="HTML",
                 reply_markup=sources_list_keyboard(sources),
             )
 
@@ -245,8 +245,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if src:
             delete_source(sid)
             await query.edit_message_text(
-                f"🗑 *{src['name']}* удалён.",
-                parse_mode="Markdown",
+                f"🗑 <b>{src['name']}</b> удалён.",
+                parse_mode="HTML",
                 reply_markup=sources_menu_keyboard(),
             )
 
@@ -255,8 +255,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         toggle_source(sid)
         sources = get_all_sources()
         await query.edit_message_text(
-            "📋 *Источники новостей*\n\n✅/❌ — активен | 🗑 — удалить | 🔄 — вкл/выкл",
-            parse_mode="Markdown",
+            "📋 <b>Источники новостей</b>\n\n✅/❌ — активен | 🗑 — удалить | 🔄 — вкл/выкл",
+            parse_mode="HTML",
             reply_markup=sources_list_keyboard(sources),
         )
 
@@ -274,15 +274,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_set_morning":
         context.user_data[STATE] = S_WAIT_MORNING
         await query.edit_message_text(
-            "🌅 Введи время утреннего дайджеста в формате ЧЧ:ММ\nПример: `08:00`",
-            parse_mode="Markdown",
+            "🌅 Введи время утреннего дайджеста в формате ЧЧ:ММ\nПример: <code>08:00</code>",
+            parse_mode="HTML",
         )
 
     elif data == "admin_set_evening":
         context.user_data[STATE] = S_WAIT_EVENING
         await query.edit_message_text(
-            "🌆 Введи время вечернего дайджеста в формате ЧЧ:ММ\nПример: `20:00`",
-            parse_mode="Markdown",
+            "🌆 Введи время вечернего дайджеста в формате ЧЧ:ММ\nПример: <code>20:00</code>",
+            parse_mode="HTML",
         )
 
     elif data == "admin_test_morning":
@@ -308,12 +308,12 @@ async def _send_test_digest(query, context, digest_type: str):
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=chunk,
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
     except Exception as e:
         logger.exception("Test digest error")
         await context.bot.send_message(
             chat_id=query.from_user.id,
-            text=f"❌ Ошибка при сборке дайджеста:\n`{e}`",
-            parse_mode="Markdown",
+            text=f"❌ Ошибка при сборке дайджеста:\n<code>{e}</code>",
+            parse_mode="HTML",
         )

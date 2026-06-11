@@ -33,14 +33,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Нет доступа.")
         return
     await update.message.reply_text(
-        "👋 *Привет! Я твой персональный дайджест-бот.*\n\n"
+        "👋 <b>Привет! Я твой персональный дайджест-бот.</b>\n\n"
         "Каждое утро и вечер буду присылать тебе сводку.\n\n"
         "📋 Команды:\n"
         "• /admin — панель управления\n"
         "• /digest — получить утренний дайджест сейчас\n"
         "• /evening — получить вечерний дайджест сейчас\n"
         "• /help — справка",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -53,10 +53,10 @@ async def cmd_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = await build_morning_digest()
         await msg.delete()
         for chunk in split_message(text):
-            await update.message.reply_text(chunk, parse_mode="Markdown")
-    except Exception as e:
+            await update.message.reply_text(chunk, parse_mode="HTML")
+    except Exception as exc:
         logger.exception("Digest command error")
-        await msg.edit_text(f"❌ Ошибка: `{e}`", parse_mode="Markdown")
+        await msg.edit_text(f"❌ Ошибка: {exc}")
 
 
 async def cmd_evening(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,17 +68,17 @@ async def cmd_evening(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = await build_evening_digest()
         await msg.delete()
         for chunk in split_message(text):
-            await update.message.reply_text(chunk, parse_mode="Markdown")
-    except Exception as e:
+            await update.message.reply_text(chunk, parse_mode="HTML")
+    except Exception as exc:
         logger.exception("Evening digest command error")
-        await msg.edit_text(f"❌ Ошибка: `{e}`", parse_mode="Markdown")
+        await msg.edit_text(f"❌ Ошибка: {exc}")
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
     await update.message.reply_text(
-        "📖 *Справка*\n\n"
+        "📖 <b>Справка</b>\n\n"
         "/start — приветствие\n"
         "/admin — панель управления (источники, расписание)\n"
         "/digest — утренний дайджест прямо сейчас\n"
@@ -88,7 +88,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Добавить RSS-ленты и Telegram-каналы\n"
         "• Изменить время утреннего и вечернего дайджеста\n"
         "• Протестировать дайджест",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
